@@ -10,7 +10,6 @@ from flask import request
 import pandas as pd
 import io
 from tqdm import tqdm
-import yfinance as yf
 from pandas_market_calendars import get_calendar
 import requests
 
