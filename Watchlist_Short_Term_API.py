@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[5]:
 
 
 import json
@@ -10,11 +10,13 @@ from flask import request
 import pandas as pd
 import io
 from tqdm import tqdm
-from pandas_market_calendars import get_calendar
 import requests
+import json
+from datetime import datetime
+from datetime import timedelta
 
 
-# In[2]:
+# In[6]:
 
 
 app = Flask(__name__)
@@ -22,23 +24,18 @@ app = Flask(__name__)
 @app.route('/watchlist',methods=["POST","GET"])
 def watchlist():
     
-    dataframe_5m = pd.DataFrame(columns=['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume', 'Dividends', 'Stock Splits', 'ticker'])
+    dataframe_5m = pd.DataFrame(columns=['Volume','Volume Weighted','Open','Close','High','Low','Datetime','N','ticker'])
     dataframe_5m.index = dataframe_5m['Datetime']
     dataframe_5m = dataframe_5m.drop(['Datetime'], axis=1)
     
-    url = 'http://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt'
-    response = requests.get(url)
-    data = response.content.decode('utf-8')
+    symbols = getSymbols()
+    
+    stocks_not_availiable = list()
 
-    nasdaq_tickers = pd.read_csv(io.StringIO(data), delimiter='|')
-    nasdaq_symbols = nasdaq_tickers['Symbol'].tolist()[:-1]
-
-    stocks_not_availiable = []
-
-    for i in tqdm(nasdaq_symbols[:150]):
+    for i in tqdm(symbols):
 
         try:
-            df = fetch_data(i,interval='5m')
+            df = fetch_data(i)
 
             if len(df) > 101:
                 dataframe_5m = pd.concat([dataframe_5m,df])
@@ -118,11 +115,38 @@ def index():
     return "Trend Indicator"
 
 
-def fetch_data(t,interval="1h"):
-    ticker = yf.Ticker(t)
-    hourly_data = ticker.history(interval=interval, period='15d')
-    hourly_data['ticker'] = [t]*len(hourly_data["Open"])
-    return hourly_data
+def getSymbols():
+
+    url = 'http://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt'
+    response = requests.get(url)
+    data = response.content.decode('utf-8')
+
+    nasdaq_tickers = pd.read_csv(io.StringIO(data), delimiter='|')
+    nasdaq_symbols = nasdaq_tickers['Symbol'].tolist()[:-1]
+    
+    return nasdaq_symbols
+
+
+def fetch_data(ticker, time='5', span='minute'):
+    
+    # get today's date
+    today = datetime.today().date()
+    date = today - timedelta(days=14)
+    # format the date in YYYY-MM-DD format
+    start_date = date.strftime('%Y-%m-%d')
+
+    url = "https://api.polygon.io/v2/aggs/ticker/"+ticker+"/range/"+time+"/"+span+"/"+str(start_date)+"/"+str(today)+"?adjusted=true&sort=asc&limit=1000&apiKey=OZ9qMq2BGinATfiZlYwW2GZ7lh4uDR8U"
+    
+    
+    response = requests.get(url)
+    ticker = json.loads(response.text)
+    
+    df = pd.DataFrame(ticker['results'])
+    df.columns = ['Volume','Volume Weighted','Open','Close','High','Low','Datetime','N']
+    df['ticker'] = [ticker['ticker']]*len(df['Open'])
+    df['Datetime'] = pd.to_datetime(df['Datetime'], unit='ms')
+    
+    return df
 
 
 def score(close):
@@ -201,11 +225,6 @@ def score(close):
     return row
 
 
-app.run()
 
-
-# In[ ]:
-
-
-
-
+if __name__ == '__main__':
+    app.run(debug=True)
