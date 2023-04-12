@@ -15,10 +15,6 @@ import json
 from datetime import datetime
 from datetime import timedelta
 
-
-# In[6]:
-
-
 app = Flask(__name__)
 
 @app.route('/watchlist',methods=["POST","GET"])
