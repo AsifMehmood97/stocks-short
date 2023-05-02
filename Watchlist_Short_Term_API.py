@@ -15,6 +15,10 @@ import json
 from datetime import datetime
 from datetime import timedelta
 
+
+# In[6]:
+
+
 app = Flask(__name__)
 
 @app.route('/watchlist',methods=["POST","GET"])
@@ -24,7 +28,7 @@ def watchlist():
     dataframe_5m.index = dataframe_5m['Datetime']
     dataframe_5m = dataframe_5m.drop(['Datetime'], axis=1)
     
-    symbols = getSymbols()
+    symbols = getSymbols(10, 4, 24)
     
     stocks_not_availiable = list()
 
@@ -111,16 +115,15 @@ def index():
     return "Trend Indicator"
 
 
-def getSymbols():
+def getSymbols(change, low_price, high_price):
 
-    url = 'http://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt'
-    response = requests.get(url)
-    data = response.content.decode('utf-8')
+    df = pd.read_csv("coins.csv")
 
-    nasdaq_tickers = pd.read_csv(io.StringIO(data), delimiter='|')
-    nasdaq_symbols = nasdaq_tickers['Symbol'].tolist()[:-1]
+    df = df[df['change']>change]
+    df = df[df['Close']>low_price]
+    df = df[df['Close']<high_price]
     
-    return nasdaq_symbols
+    return df['ticker']
 
 
 def fetch_data(ticker, time='5', span='minute'):
